@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  compile-and-test:
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --experimental-vm-modules
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install the Compact toolchain
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf https://github.com/midnightntwrk/compact/releases/latest/download/compact-installer.sh | sh
+          export PATH="$HOME/.compact/bin:$HOME/.local/bin:$PATH"
+          compact update 0.31.1
+          compact compile --version
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Compile the TenderShield contract
+        run: |
+          export PATH="$HOME/.compact/bin:$HOME/.local/bin:$PATH"
+          npm run compile
+
+      - name: Start the local Midnight devnet
+        run: docker compose up -d --wait
+
+      - name: Run the test suite
+        run: npm run test:local
+
+      - name: Tear down the devnet
+        run: docker compose down
